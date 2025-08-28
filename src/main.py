@@ -94,11 +94,16 @@ class NovelDownloader:
         tzj = self._get_initial_chapter_id()
 
         if os.path.exists(self.cookie_path):
+            self.log_callback('检测到已有cookie，正在验证...')
             with open(self.cookie_path, 'r', encoding='UTF-8') as f:
                 self.cookie = json.load(f)
                 if self._test_cookie(tzj, self.cookie) == 'err':
+                    self.log_callback('原有cookie无效，尝试重新获取')
                     self._get_new_cookie(tzj)
+                else:
+                    self.log_callback('原有cookie有效')
         else:
+            self.log_callback('未找到cookie文件，尝试获取新的cookie')
             self._get_new_cookie(tzj)
 
         self.log_callback('Cookie获取成功')
@@ -246,13 +251,18 @@ class NovelDownloader:
     def _get_new_cookie(self, chapter_id: int):
         """Generate new cookie"""
         bas = 1000000000000000000
-        for i in range(random.randint(bas * 6, bas * 8), bas * 9):
+        start = random.randint(bas * 6, bas * 8)
+        self.log_callback(f'开始枚举 novel_web_id，起始值：{start}')
+        for attempt, i in enumerate(range(start, bas * 9), 1):
+            self.log_callback(f'第{attempt}次尝试: novel_web_id={i}')
             time.sleep(random.randint(50, 150) / 1000)
             self.cookie = f'novel_web_id={i}'
             if len(self._download_chapter_content(chapter_id, test_mode=True)) > 200:
+                self.log_callback(f'成功获取有效 cookie: {self.cookie}')
                 with open(self.cookie_path, 'w', encoding='UTF-8') as f:
                     json.dump(self.cookie, f)
                 return
+        self.log_callback('未能获取有效 cookie')
 
     def _download_txt(self, novel_id: int) -> str:
         """Download novel in TXT format"""
@@ -862,9 +872,12 @@ class NovelDownloader:
 
     def _test_cookie(self, chapter_id: int, cookie: str) -> str:
         """Test if cookie is valid"""
+        self.log_callback('正在测试cookie有效性')
         self.cookie = cookie
         if len(self._download_chapter_content(chapter_id, test_mode=True)) > 200:
+            self.log_callback('cookie有效')
             return 's'
+        self.log_callback('cookie无效')
         return 'err'
 
     def _get_chapter_list(self, novel_id: int) -> tuple:
